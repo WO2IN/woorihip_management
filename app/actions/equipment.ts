@@ -45,11 +45,7 @@ export interface EquipmentInput {
 export async function createEquipment(data: EquipmentInput) {
   const created = insertRow("equipment", {
     name: data.name,
-<<<<<<< HEAD
     floor: data.floor || null,
-=======
-    floor: canonicalFloor(data.floor, data.name),
->>>>>>> 39edeed (Update)
     department: data.department || null,
     manager: data.manager || null,
     inspectorName: data.inspectorName || null,
@@ -69,11 +65,7 @@ export async function createEquipment(data: EquipmentInput) {
 export async function updateEquipment(id: number, data: Partial<EquipmentInput>) {
   updateById("equipment", id, {
     ...(data.name !== undefined ? { name: data.name } : {}),
-<<<<<<< HEAD
     ...(data.floor !== undefined ? { floor: data.floor || null } : {}),
-=======
-    ...(data.floor !== undefined ? { floor: canonicalFloor(data.floor, data.name) } : {}),
->>>>>>> 39edeed (Update)
     ...(data.department !== undefined ? { department: data.department || null } : {}),
     ...(data.manager !== undefined ? { manager: data.manager || null } : {}),
     ...(data.inspectorName !== undefined ? { inspectorName: data.inspectorName || null } : {}),

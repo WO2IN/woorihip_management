@@ -493,9 +493,18 @@
     white-space: nowrap !important;
   }
 
-  .print-content-cell {
-    min-width: 0 !important;
-    width: 140px !important;
+.print-content-cell {
+  min-width: 0 !important;
+  width: 180px !important;
+  }
+
+  .print-content-cell input {
+  width: 100% !important;
+  min-width: 0 !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  font-size: 7px !important;
+  letter-spacing: -0.25px !important;
   }
 
   .print-method-cell {

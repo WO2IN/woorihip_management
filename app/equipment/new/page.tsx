@@ -162,7 +162,6 @@ export default function NewEquipmentPage() {
                 </Field>
                 <Field>
                   <FieldLabel htmlFor="floor">층</FieldLabel>
-<<<<<<< HEAD
                   <Input
                     id="floor"
                     value={basic.floor}
@@ -170,7 +169,6 @@ export default function NewEquipmentPage() {
                     placeholder="예: 3"
                     inputMode="numeric"
                   />
-=======
                   <Select value={basic.floor ?? null} onValueChange={(value) => setBasic((f) => ({ ...f, floor: value ?? '' }))}>
                     <SelectTrigger id="floor" className="w-full">
                       <SelectValue placeholder="층을 선택하세요" />
@@ -181,7 +179,6 @@ export default function NewEquipmentPage() {
                     ))}
                     </SelectContent>
                   </Select>
->>>>>>> 39edeed (Update)
                 </Field>
                 <Field>
                   <FieldLabel htmlFor="department">점검부서</FieldLabel>

@@ -9,7 +9,6 @@ import { formatFloorLabel, groupByFloor } from '@/lib/floor'
 
 export default async function EquipmentPage() {
   const list = await getEquipmentList()
-<<<<<<< HEAD
   const floors = new Map<string, typeof list>()
   for (const item of list) {
     const detectedFloor = item.floor || item.name.match(/(\d+)층/)?.[1] || '미지정'
@@ -22,9 +21,6 @@ export default async function EquipmentPage() {
     if (b === '미지정') return -1
     return Number(a) - Number(b)
   })
-=======
-  const floorEntries = groupByFloor(list)
->>>>>>> 39edeed (Update)
 
   return (
     <div className="min-h-screen">
@@ -60,21 +56,13 @@ export default async function EquipmentPage() {
                 <div className="mb-3 flex items-center gap-2">
                   <Layers3Icon className="size-5 text-primary" aria-hidden="true" />
                   <h2 id={`floor-${floor}`} className="text-lg font-semibold">
-<<<<<<< HEAD
                     {floor === '미지정' ? '층 미지정' : `${floor}층`}
-=======
-                    {formatFloorLabel(floor)}
->>>>>>> 39edeed (Update)
                   </h2>
                   <span className="text-sm text-muted-foreground">{items.length}개</span>
                 </div>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {items.map((item) => (
-<<<<<<< HEAD
                     <EquipmentCard key={item.id} equipment={{ ...item, floor: item.floor || (item.name.match(/(\\d+)층/)?.[1] ?? null) }} />
-=======
-                    <EquipmentCard key={item.id} equipment={item} />
->>>>>>> 39edeed (Update)
                   ))}
                 </div>
               </section>

@@ -277,19 +277,19 @@ export function FiveSGrid({ sheetId, year, month, items, entries, holidays = [],
             <tr>
               <th
                 rowSpan={2}
-                className="print-category-cell w-14 border-r border-b border-border bg-muted p-1 text-sm font-medium"
+                className="print-category-cell w-12 print:w-14 border-r border-b border-border bg-muted p-1 text-sm font-medium"
               >
                 구분
               </th>
               <th
                 rowSpan={2}
-                className="print-content-cell min-w-56 border-r border-b border-border bg-muted p-1 text-left text-sm font-medium"
+                className="print-content-cell min-w-48 print:min-w-56 border-r border-b border-border bg-muted p-1 text-left text-sm font-medium"
               >
                 점검 내용
               </th>
               <th
                 rowSpan={2}
-                className="print-cycle-cell w-14 border-r border-b border-border bg-muted p-1 text-sm font-medium"
+                className="print-cycle-cell w-10 print:w-14 border-r border-b border-border bg-muted p-1 text-sm font-medium"
               >
                 주기
               </th>
@@ -328,7 +328,7 @@ export function FiveSGrid({ sheetId, year, month, items, entries, holidays = [],
                       {category}
                     </td>
                   )}
-                  <td className="print-content-cell border-r border-b border-border p-1.5 print:p-0 text-left">
+                  <td className="print-content-cell whitespace-nowrap border-r border-b border-border p-1.5 print:p-0 text-left">
                     <Input
                       defaultValue={item.content}
                       aria-label={`${category} ${item.no}번 점검 내용`}
@@ -336,7 +336,7 @@ export function FiveSGrid({ sheetId, year, month, items, entries, holidays = [],
                       className="h-8 print:h-5 rounded-none border-0 bg-transparent px-1 text-xs print:text-[10px] shadow-none focus-visible:ring-1"
                     />
                   </td>
-                  <td className="print-cycle-cell border-r border-b border-border p-0 text-center">
+                  <td className="print-cycle-cell w-10 print:w-14 border-r border-b border-border p-0 text-center">
                     <CellSelect
                       aria-label={`${category} ${item.no}번 주기`}
                       value={item.cycle || '일'}
