@@ -12092,6 +12092,18 @@
       "reviewer": null,
       "approver": null,
       "createdAt": "2026-10-01T05:52:47.987Z"
+    },
+    {
+      "id": 22,
+      "equipmentId": 9,
+      "year": 2026,
+      "month": 10,
+      "department": "생산팀",
+      "manager": "곽명석 과장",
+      "writer": null,
+      "reviewer": null,
+      "approver": null,
+      "createdAt": "2026-10-06T04:53:50.422Z"
     }
   ],
   "dailyCheckEntries": [
@@ -20671,7 +20683,7 @@
     "equipmentPhotos": 48,
     "dailyCheckItems": 56,
     "equipmentEmergencyGuides": 9,
-    "dailyCheckSheets": 21,
+    "dailyCheckSheets": 22,
     "dailyCheckEntries": 2241
   }
 }

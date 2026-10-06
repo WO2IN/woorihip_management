@@ -2,12 +2,7 @@ import Link from 'next/link'
 import { ClipboardCheckIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-const NAV_ITEMS = [
-  { href: '/', label: '대시보드' },
-  { href: '/checksheets/5s', label: '3정 5S' },
-  { href: '/checksheets/daily', label: '설비 일상점검' },
-  { href: '/checksheets/temp-humidity', label: '온/습도' },
-]
+const NAV_ITEMS = [{ href: '/', label: '대시보드' }]
 
 export function SiteHeader({ active }: { active?: string }) {
   return (

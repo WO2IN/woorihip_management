@@ -4,10 +4,12 @@ import { SiteHeader } from '@/components/site-header'
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from '@/components/ui/empty'
 import { TargetCreateDialog } from '@/components/target-create-dialog'
 import { TargetListRow } from '@/components/target-list-row'
-import { formatFloorLabel, groupByFloor } from '@/lib/floor'
+import { formatFloorLabel, groupByFloor, detectFloor } from '@/lib/floor'
 
-export default async function TempHumidityIndexPage() {
-  const targetList = await getTempHumidityTargets()
+export default async function TempHumidityIndexPage({ searchParams }: { searchParams: Promise<{ floor?: string }> }) {
+  const { floor: selectedFloor } = await searchParams
+  const allTargets = await getTempHumidityTargets()
+  const targetList = selectedFloor ? allTargets.filter((item) => detectFloor(item.floor, item.name) === selectedFloor) : allTargets
 
   return (
     <div className="min-h-dvh bg-background">
@@ -46,7 +48,7 @@ export default async function TempHumidityIndexPage() {
           </Empty>
         ) : (
           <div className="space-y-6">
-            {groupByFloor(targetList).map(([floor, items]) => (
+            {groupByFloor(targetList).filter(([floor]) => !selectedFloor || floor === selectedFloor).map(([floor, items]) => (
               <section key={floor} aria-labelledby={`temp-floor-${floor}`}>
                 <div className="mb-2 flex items-center gap-2">
                   <Layers3Icon className="size-5 text-primary" aria-hidden="true" />

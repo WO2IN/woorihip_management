@@ -5,10 +5,12 @@ import { SiteHeader } from '@/components/site-header'
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from '@/components/ui/empty'
 import { buttonVariants } from '@/components/ui/button'
 import { TargetListRow } from '@/components/target-list-row'
-import { formatFloorLabel, groupByFloor } from '@/lib/floor'
+import { formatFloorLabel, groupByFloor, detectFloor } from '@/lib/floor'
 
-export default async function DailyCheckIndexPage() {
-  const equipmentList = await getEquipmentList()
+export default async function DailyCheckIndexPage({ searchParams }: { searchParams: Promise<{ floor?: string }> }) {
+  const { floor: selectedFloor } = await searchParams
+  const allEquipment = await getEquipmentList()
+  const equipmentList = selectedFloor ? allEquipment.filter((item) => detectFloor(item.floor, item.name) === selectedFloor) : allEquipment
 
   return (
     <div className="min-h-dvh bg-background">
@@ -42,7 +44,7 @@ export default async function DailyCheckIndexPage() {
           </Empty>
         ) : (
           <div className="space-y-6">
-            {groupByFloor(equipmentList).map(([floor, items]) => (
+            {groupByFloor(equipmentList).filter(([floor]) => !selectedFloor || floor === selectedFloor).map(([floor, items]) => (
               <section key={floor} aria-labelledby={`daily-floor-${floor}`}>
                 <div className="mb-2 flex items-center gap-2">
                   <Layers3Icon className="size-5 text-primary" aria-hidden="true" />

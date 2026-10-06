@@ -9,7 +9,7 @@ const _geistMono = Geist_Mono({ subsets: ['latin'], variable: '--font-geist-mono
 
 export const metadata: Metadata = {
   title: '설비/품질 점검 관리시스템',
-  description: '3정 5S, 설비 일상점검, 온/습도 체크시트를 온라인으로 관리합니다.',
+  description: '설비 및 품질 점검 기록을 한눈에 확인하는 대시보드입니다.',
   generator: 'v0.app',
   icons: {
     icon: [
