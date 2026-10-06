@@ -57,7 +57,7 @@ export async function createEquipment(data: EquipmentInput) {
     escalationNote: data.escalationNote || null,
     createdAt: new Date().toISOString(),
   })
-  revalidatePath("/equipment")
+  revalidatePath("/")
   revalidatePath("/checksheets/daily")
   return created
 }
@@ -76,9 +76,9 @@ export async function updateEquipment(id: number, data: Partial<EquipmentInput>)
     ...(data.managerCycle !== undefined ? { managerCycle: data.managerCycle || null } : {}),
     ...(data.escalationNote !== undefined ? { escalationNote: data.escalationNote || null } : {}),
   })
-  revalidatePath("/equipment")
-  revalidatePath(`/equipment/${id}`)
+  revalidatePath("/")
   revalidatePath("/checksheets/daily")
+  revalidatePath(`/checksheets/daily/${id}`)
 }
 
 export async function deleteEquipment(id: number) {
@@ -96,7 +96,7 @@ export async function deleteEquipment(id: number) {
   removeWhere("equipmentPhotos", (p) => p.equipmentId === id)
   removeWhere("dailyCheckItems", (i) => i.equipmentId === id)
   removeWhere("equipment", (e) => e.id === id)
-  revalidatePath("/equipment")
+  revalidatePath("/")
   revalidatePath("/checksheets/daily")
 }
 
@@ -114,14 +114,20 @@ export async function addEquipmentPhoto(equipmentId: number, url: string, label?
     sortOrder: 0,
     createdAt: new Date().toISOString(),
   })
-  revalidatePath(`/equipment/${equipmentId}`)
+  revalidatePath(`/checksheets/daily/${equipmentId}`)
   return created
+}
+
+export async function updateEquipmentPhoto(id: number, equipmentId: number, url: string, oldUrl: string) {
+  updateById("equipmentPhotos", id, { url })
+  deleteLocalUpload(oldUrl)
+  revalidatePath(`/checksheets/daily/${equipmentId}`)
 }
 
 export async function deleteEquipmentPhoto(id: number, equipmentId: number, url: string) {
   removeWhere("equipmentPhotos", (p) => p.id === id && p.equipmentId === equipmentId)
   deleteLocalUpload(url)
-  revalidatePath(`/equipment/${equipmentId}`)
+  revalidatePath(`/checksheets/daily/${equipmentId}`)
 }
 
 export async function getDailyCheckItems(equipmentId: number) {
@@ -132,17 +138,17 @@ export async function getDailyCheckItems(equipmentId: number) {
 
 export async function createDailyCheckItem(
   equipmentId: number,
-  data: { itemNo: number; content: string; method?: string; cycle?: string; sortOrder?: number },
+  data: { itemNo: number; content: string; area?: string; method?: string; cycle?: string; sortOrder?: number },
 ) {
   const created = insertRow("dailyCheckItems", {
     equipmentId,
     itemNo: data.itemNo,
     content: data.content,
+    area: data.area?.trim() || "",
     method: data.method?.trim() || "육안",
     cycle: data.cycle?.trim() || "일",
     sortOrder: data.sortOrder ?? data.itemNo,
   })
-  revalidatePath(`/equipment/${equipmentId}`)
   revalidatePath(`/checksheets/daily/${equipmentId}`)
   return created
 }
@@ -150,21 +156,20 @@ export async function createDailyCheckItem(
 export async function updateDailyCheckItem(
   id: number,
   equipmentId: number,
-  data: { itemNo?: number; content?: string; method?: string; cycle?: string },
+  data: { itemNo?: number; content?: string; area?: string; method?: string; cycle?: string },
 ) {
   updateById("dailyCheckItems", id, {
     ...(data.itemNo !== undefined ? { itemNo: data.itemNo } : {}),
     ...(data.content !== undefined ? { content: data.content } : {}),
+    ...(data.area !== undefined ? { area: data.area.trim() } : {}),
     ...(data.method !== undefined ? { method: data.method?.trim() || "육안" } : {}),
     ...(data.cycle !== undefined ? { cycle: data.cycle?.trim() || "일" } : {}),
   })
-  revalidatePath(`/equipment/${equipmentId}`)
   revalidatePath(`/checksheets/daily/${equipmentId}`)
 }
 
 export async function deleteDailyCheckItem(id: number, equipmentId: number) {
   removeWhere("dailyCheckItems", (i) => i.id === id)
-  revalidatePath(`/equipment/${equipmentId}`)
   revalidatePath(`/checksheets/daily/${equipmentId}`)
 }
 
@@ -188,7 +193,7 @@ export async function createEquipmentEmergencyGuide(
     emergencyAction: data.emergencyAction || null,
     sortOrder: data.sortOrder ?? 0,
   })
-  revalidatePath(`/equipment/${equipmentId}`)
+  revalidatePath(`/checksheets/daily/${equipmentId}`)
   return created
 }
 
@@ -201,12 +206,12 @@ export async function updateEquipmentEmergencyGuide(
   },
 ) {
   updateById("equipmentEmergencyGuides", id, data)
-  revalidatePath(`/equipment/${equipmentId}`)
+  revalidatePath(`/checksheets/daily/${equipmentId}`)
 }
 
 export async function deleteEquipmentEmergencyGuide(id: number, equipmentId: number) {
   removeWhere("equipmentEmergencyGuides", (i) => i.id === id)
-  revalidatePath(`/equipment/${equipmentId}`)
+  revalidatePath(`/checksheets/daily/${equipmentId}`)
 }
 
 export async function getEquipmentEmergencyHistories(equipmentId: number) {
@@ -235,7 +240,7 @@ export async function createEquipmentEmergencyHistory(
     note: data.note || null,
     sortOrder: data.sortOrder ?? 0,
   })
-  revalidatePath(`/equipment/${equipmentId}`)
+  revalidatePath(`/checksheets/daily/${equipmentId}`)
   return created
 }
 
@@ -251,10 +256,10 @@ export async function updateEquipmentEmergencyHistory(
   },
 ) {
   updateById("equipmentEmergencyHistories", id, data)
-  revalidatePath(`/equipment/${equipmentId}`)
+  revalidatePath(`/checksheets/daily/${equipmentId}`)
 }
 
 export async function deleteEquipmentEmergencyHistory(id: number, equipmentId: number) {
   removeWhere("equipmentEmergencyHistories", (i) => i.id === id)
-  revalidatePath(`/equipment/${equipmentId}`)
+  revalidatePath(`/checksheets/daily/${equipmentId}`)
 }

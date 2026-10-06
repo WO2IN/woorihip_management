@@ -1,19 +1,21 @@
 import { Layers3Icon, WrenchIcon } from 'lucide-react'
 import { getFiveSTargets, createFiveSTarget, deleteFiveSTarget } from '@/app/actions/five-s'
-import { SiteHeader } from '@/components/site-header'
+import { SiteHeader } from '@/components/layout/site-header'
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from '@/components/ui/empty'
-import { TargetCreateDialog } from '@/components/target-create-dialog'
-import { TargetListRow } from '@/components/target-list-row'
+import { TargetCreateDialog } from '@/components/shared/target-create-dialog'
+import { TargetListRow } from '@/components/shared/target-list-row'
 import { formatFloorLabel, groupByFloor, detectFloor } from '@/lib/floor'
+import { getTodayCheckStatuses } from '@/app/actions/today-status'
+import { compareTodayStatus, todayStatusLabel } from '@/lib/today-check'
 
 export default async function FiveSIndexPage({ searchParams }: { searchParams: Promise<{ floor?: string }> }) {
   const { floor: selectedFloor } = await searchParams
-  const allTargets = await getFiveSTargets()
+  const [allTargets, today] = await Promise.all([getFiveSTargets(), getTodayCheckStatuses()])
   const targetList = selectedFloor ? allTargets.filter((item) => detectFloor(item.floor, item.name) === selectedFloor) : allTargets
 
   return (
     <div className="min-h-dvh bg-background">
-      <SiteHeader active="/checksheets/5s" />
+      <SiteHeader />
       <main className="mx-auto flex max-w-[1400px] flex-col gap-4 px-4 py-6 sm:px-6">
         <div className="flex items-center justify-between">
           <div>
@@ -56,20 +58,28 @@ export default async function FiveSIndexPage({ searchParams }: { searchParams: P
                   <span className="text-sm text-muted-foreground">{items.length}개</span>
                 </div>
                 <div className="flex flex-col divide-y divide-border border border-border">
-                  {items.map((item) => (
-                    <TargetListRow
-                      key={item.id}
-                      href={`/checksheets/5s/${item.id}`}
-                      name={item.name}
-                      floor={item.floor || ''}
-                      department={item.department}
-                      manager={item.manager}
-                      deleteTitle="이 항목을 삭제할까요?"
-                      deleteDescription={`${item.name} 항목과 입력된 3정 5S 점검 내용이 함께 삭제됩니다. 이 작업은 되돌릴 수 없습니다.`}
-                      deleteAction={deleteFiveSTarget}
-                      id={item.id}
-                    />
-                  ))}
+                  {[...items]
+                    .sort((a, b) => compareTodayStatus(today.fiveS[a.id] ?? 'off', today.fiveS[b.id] ?? 'off'))
+                    .map((item) => {
+                      const status = today.fiveS[item.id] ?? 'off'
+                      return (
+                        <TargetListRow
+                          key={item.id}
+                          href={`/checksheets/5s/${item.id}`}
+                          name={item.name}
+                          floor={item.floor || ''}
+                          department={item.department}
+                          manager={item.manager}
+                          inspectorName={item.manager}
+                          deleteTitle="이 항목을 삭제할까요?"
+                          deleteDescription={`${item.name} 항목과 입력된 3정 5S 점검 내용이 함께 삭제됩니다. 이 작업은 되돌릴 수 없습니다.`}
+                          deleteAction={deleteFiveSTarget}
+                          id={item.id}
+                          status={status}
+                          statusLabel={todayStatusLabel(status, today.weekend)}
+                        />
+                      )
+                    })}
                 </div>
               </section>
             ))}

@@ -169,6 +169,17 @@
   display: none;
 }
 
+.today-col {
+  background-color: oklch(0.93 0.04 85);
+  color: oklch(0.35 0.08 70);
+  font-weight: 700;
+}
+
+.missing-today {
+  background-color: oklch(0.94 0.07 85);
+  box-shadow: inset 0 0 0 2px oklch(0.72 0.14 70);
+}
+
 @media print {
   @page {
     size: A4 landscape;
@@ -277,6 +288,13 @@
 
   .weekend-cell {
     background-color: #d4d4d8 !important;
+  }
+
+  .today-col,
+  .missing-today {
+    background-color: transparent !important;
+    box-shadow: none !important;
+    color: inherit !important;
   }
 
   .monthly-cell {
@@ -409,21 +427,41 @@
 
   .print-photo-box {
     flex: 0 0 auto !important;
-    max-height: 400px !important;
+    max-height: none !important;
     border: 1.5px solid #000 !important;
     padding: 4px 6px !important;
-    display: block !important;
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    align-items: flex-start !important;
+    gap: 4px !important;
     overflow: hidden !important;
-    /* Clear floats if any, but also clip */
     break-inside: avoid !important;
     page-break-inside: avoid !important;
   }
 
   .print-photo-box figure {
-    float: left;
-    margin-right: 6px;
-    margin-bottom: 2px;
-    width: auto !important;
+    float: none !important;
+    margin: 0 !important;
+    min-width: 0 !important;
+  }
+
+  .print-photo-overview {
+    flex: 0 0 48mm !important;
+    width: 48mm !important;
+  }
+
+  .print-photo-parts {
+    display: flex !important;
+    flex: 1 1 0 !important;
+    flex-wrap: nowrap !important;
+    min-width: 0 !important;
+    gap: 2px !important;
+  }
+
+  .print-photo-parts figure {
+    flex: 0 1 28mm !important;
+    width: 28mm !important;
+    max-width: 28mm !important;
   }
 
   .print-photo-box figcaption {
@@ -432,17 +470,18 @@
   }
 
   .print-photo-box img {
-    height: 120px !important;
-    width: auto !important;
-    max-width: 200px !important;
-    aspect-ratio: auto !important;
+    height: auto !important;
+    width: 100% !important;
+    max-width: none !important;
     object-fit: cover !important;
   }
 
-  .print-photo-box::after {
-    content: "";
-    display: table;
-    clear: both;
+  .print-photo-overview img {
+    aspect-ratio: 16 / 10 !important;
+  }
+
+  .print-photo-parts img {
+    aspect-ratio: 1 !important;
   }
 
   .print-sheet {

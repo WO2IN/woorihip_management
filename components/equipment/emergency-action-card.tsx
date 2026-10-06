@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { EmergencyFlowTable, EmergencyGuide, EmergencyHistory } from '@/components/emergency-flow-table'
+import { EmergencyFlowTable, EmergencyGuide, EmergencyHistory } from '@/components/equipment/emergency-flow-table'
 import {
   createEquipmentEmergencyGuide,
   updateEquipmentEmergencyGuide,

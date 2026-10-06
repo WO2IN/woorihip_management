@@ -7,15 +7,16 @@ import {
   updateFiveSTarget,
   toggleFiveSHoliday,
 } from '@/app/actions/five-s'
-import { SiteHeader } from '@/components/site-header'
-import { YearMonthPicker } from '@/components/year-month-picker'
-import { ApprovalBox } from '@/components/approval-box'
-import { RemarksField } from '@/components/remarks-field'
-import { PrintButton } from '@/components/print-button'
-import { FiveSGrid } from '@/components/five-s-grid'
+import { SiteHeader } from '@/components/layout/site-header'
+import { YearMonthPicker } from '@/components/shared/year-month-picker'
+import { ApprovalBox } from '@/components/shared/approval-box'
+import { RemarksField } from '@/components/shared/remarks-field'
+import { PrintButton } from '@/components/shared/print-button'
+import { FiveSGrid } from '@/components/checksheets/five-s/five-s-grid'
+import { FiveSSheetEditor } from '@/components/checksheets/five-s/five-s-sheet-editor'
 import { currentYearMonth } from '@/lib/date-utils'
 import { notFound } from 'next/navigation'
-import { SheetHeaderEditor } from '@/components/sheet-header-editor'
+import { SheetHeaderEditor } from '@/components/shared/sheet-header-editor'
 
 export default async function FiveSPage({
   params,
@@ -55,11 +56,12 @@ export default async function FiveSPage({
 
   return (
     <div className="min-h-dvh bg-background">
-      <SiteHeader active="/checksheets/5s" />
+      <SiteHeader />
       <main className="print-page mx-auto flex max-w-[1400px] flex-col gap-4 px-4 py-6 sm:px-6">
         <div className="no-print flex flex-wrap items-center justify-between gap-3">
           <YearMonthPicker year={year} month={month} />
           <div className="flex items-center gap-2">
+            <FiveSSheetEditor targetId={tId} targetName={target.name} items={items as any} />
             <PrintButton />
           </div>
         </div>
@@ -109,6 +111,7 @@ export default async function FiveSPage({
           items={items as any}
           entries={entries}
           holidays={holidays}
+          workdays={(sheet as any).workdays ?? []}
           onToggleHoliday={toggleHoliday}
         />
 

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache"
 import { findOne, insertRow, removeWhere, selectWhere, updateById, selectAll } from "@/lib/local-store"
 import { canonicalFloor } from "@/lib/floor"
+import { isWeekend } from "@/lib/date-utils"
 
 export async function getTempHumidityTargets() {
   return selectAll("tempHumidityTargets")
@@ -148,9 +149,25 @@ export async function updateTempHumiditySheetFields(
 
 export async function toggleTempHumidityHoliday(sheetId: number, day: number) {
   const sheet = findOne<any>("tempHumiditySheets", (s: any) => s.id === sheetId)
-  const current: number[] = sheet?.holidays ?? []
-  const next = current.includes(day) ? current.filter((d) => d !== day) : [...current, day].sort((a, b) => a - b)
+  if (!sheet) return []
+  if (isWeekend(sheet.year, sheet.month, day)) {
+    const current: number[] = sheet.workdays ?? []
+    const opening = !current.includes(day)
+    const next = opening ? [...current, day].sort((a, b) => a - b) : current.filter((d: number) => d !== day)
+    updateById("tempHumiditySheets", sheetId, { workdays: next })
+    if (!opening) {
+      removeWhere("tempHumidityEntries", (e: any) => e.sheetId === sheetId && e.day === day)
+    }
+    revalidatePath("/checksheets/temp-humidity")
+    revalidatePath("/checksheets/temp-humidity/[targetId]", "layout")
+    return next
+  }
+  const current: number[] = sheet.holidays ?? []
+  const next = current.includes(day) ? current.filter((d: number) => d !== day) : [...current, day].sort((a, b) => a - b)
   updateById("tempHumiditySheets", sheetId, { holidays: next })
+  if (!current.includes(day)) {
+    removeWhere("tempHumidityEntries", (e: any) => e.sheetId === sheetId && e.day === day)
+  }
   revalidatePath("/checksheets/temp-humidity")
   revalidatePath("/checksheets/temp-humidity/[targetId]", "layout")
   return next

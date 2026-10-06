@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useOptimistic, useRef, useState, useTransition } from 'react'
 import { cn } from '@/lib/utils'
-import { getCheckerInitial, getDayRange, isWeekend, scheduledDaysForCycle } from '@/lib/date-utils'
+import { getCheckerInitial, getDayRange, isDayOffDate, isWeekend, scheduledDaysForCycle } from '@/lib/date-utils'
+import { isDueOnDay } from '@/lib/today-check'
 import {
   upsertDailyCheckEntry,
   bulkFillDailyCheckEntries,
@@ -15,9 +16,9 @@ import { CHECK_METHODS, ITEM_CYCLES, STAFF_CYCLES } from '@/lib/constants/check-
 import { Trash2Icon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { CellSelect } from '@/components/cell-select'
-import { HolidayPickerPopover } from '@/components/holiday-picker-popover'
-import { RangeFillPopover } from '@/components/range-fill-popover'
+import { CellSelect } from '@/components/shared/cell-select'
+import { HolidayPickerPopover } from '@/components/shared/holiday-picker-popover'
+import { RangeFillPopover } from '@/components/shared/range-fill-popover'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -63,6 +64,7 @@ interface DailyCheckGridProps {
   items: DailyCheckItem[]
   entries: { itemId: number; day: number; value: string | null }[]
   holidays?: number[]
+  workdays?: number[]
   onToggleHoliday?: (day: number) => void
   inspector?: StaffInfo
   manager?: StaffInfo
@@ -78,6 +80,7 @@ export function DailyCheckGrid({
   items,
   entries,
   holidays = [],
+  workdays = [],
   onToggleHoliday,
   inspector,
   manager,
@@ -107,9 +110,14 @@ export function DailyCheckGrid({
     (state, day: number) =>
       state.includes(day) ? state.filter((d) => d !== day) : [...state, day].sort((a, b) => a - b),
   )
+  const [optimisticWorkdays, toggleOptimisticWorkday] = useOptimistic(
+    workdays,
+    (state, day: number) =>
+      state.includes(day) ? state.filter((d) => d !== day) : [...state, day].sort((a, b) => a - b),
+  )
 
   function isDayOff(day: number) {
-    return isWeekend(year, month, day) || optimisticHolidays.includes(day)
+    return isDayOffDate(year, month, day, optimisticHolidays, optimisticWorkdays)
   }
 
   const entryMap = new Map(entries.map((e) => [`${e.itemId}-${e.day}`, e.value ?? '']))
@@ -169,7 +177,6 @@ export function DailyCheckGrid({
   }, [])
 
   function handleCellClick(itemId: number, day: number) {
-    if (isDayOff(day)) return
     const key = `${itemId}-${day}`
     const current = optimisticEntries.get(key) ?? ''
     const next = current === selectedSymbol ? '' : selectedSymbol
@@ -180,7 +187,6 @@ export function DailyCheckGrid({
   }
 
   function handleMarkClick(role: 'inspector' | 'manager', day: number) {
-    if (isDayOff(day)) return
     startTransition(() => {
       if (role === 'inspector') setOptimisticInspectorMarks({ day })
       else setOptimisticManagerMarks({ day })
@@ -244,7 +250,29 @@ export function DailyCheckGrid({
   }
 
   function handleHolidayToggle(day: number) {
-    if (isWeekend(year, month, day) || !onToggleHoliday) return
+    if (!onToggleHoliday) return
+    const weekend = isWeekend(year, month, day)
+    if (weekend) {
+      const opening = !optimisticWorkdays.includes(day)
+      startTransition(() => {
+        toggleOptimisticWorkday(day)
+        if (!opening) {
+          for (const item of items) {
+            setOptimisticEntry({ key: `${item.id}-${day}`, value: '' })
+          }
+          setOptimisticInspectorMarks({
+            day: 0,
+            days: optimisticInspectorMarks.filter((d) => d !== day),
+          })
+          setOptimisticManagerMarks({
+            day: 0,
+            days: optimisticManagerMarks.filter((d) => d !== day),
+          })
+        }
+        onToggleHoliday(day)
+      })
+      return
+    }
     const adding = !optimisticHolidays.includes(day)
     startTransition(() => {
       toggleOptimisticHoliday(day)
@@ -319,6 +347,7 @@ export function DailyCheckGrid({
               year={year}
               month={month}
               holidays={optimisticHolidays}
+              workdays={optimisticWorkdays}
               onToggle={handleHolidayToggle}
             />
           )}
@@ -359,6 +388,7 @@ export function DailyCheckGrid({
       </div>
       <p className="no-print px-1 text-xs text-muted-foreground">
         위에서 표시를 선택한 뒤 칸을 클릭하면 바로 입력됩니다. 같은 표시를 다시 클릭하면 지워집니다. 아래 점검자·관리자 칸을 클릭하면 서명됩니다.
+        {isCurrentMonth ? ' 오늘 채워야 하는데 비어 있는 칸은 노란색으로 표시됩니다.' : ''}
       </p>
 
       <div className="print-sheet overflow-x-auto border border-border">
@@ -395,14 +425,14 @@ export function DailyCheckGrid({
             </tr>
             <tr>
               {days.map((day) => {
-                const weekend = isWeekend(year, month, day)
-                const holiday = optimisticHolidays.includes(day)
+                const dayOff = isDayOff(day)
                 return (
                   <th
                     key={day}
                     className={cn(
                       'print-day-cell h-7 w-8 border-r border-b border-border p-0 text-xs font-medium last:border-r-0',
-                      (weekend || holiday) && 'weekend-cell bg-muted-foreground/10',
+                      dayOff && 'weekend-cell bg-muted-foreground/10',
+                      isCurrentMonth && day === todayDay && 'today-col',
                     )}
                   >
                     {day}
@@ -417,6 +447,10 @@ export function DailyCheckGrid({
                 key={item.id}
                 item={item}
                 equipmentId={equipmentId}
+                year={year}
+                month={month}
+                todayDay={todayDay}
+                isCurrentMonth={isCurrentMonth}
                 days={days}
                 optimisticEntries={optimisticEntries}
                 isDayOff={isDayOff}
@@ -434,6 +468,10 @@ export function DailyCheckGrid({
               descPlaceholder="예: 1일 점검"
               cycleOptions={STAFF_CYCLES}
               defaultCycle="1회/일"
+              year={year}
+              month={month}
+              todayDay={todayDay}
+              isCurrentMonth={isCurrentMonth}
               days={days}
               marks={optimisticInspectorMarks}
               markChar={inspectorInitial}
@@ -449,6 +487,10 @@ export function DailyCheckGrid({
               descPlaceholder="예: 주간 점검 확인"
               cycleOptions={STAFF_CYCLES}
               defaultCycle="1회/주"
+              year={year}
+              month={month}
+              todayDay={todayDay}
+              isCurrentMonth={isCurrentMonth}
               days={days}
               marks={optimisticManagerMarks}
               markChar={managerInitial}
@@ -465,6 +507,10 @@ export function DailyCheckGrid({
 function CheckItemRow({
   item,
   equipmentId,
+  year,
+  month,
+  todayDay,
+  isCurrentMonth,
   days,
   optimisticEntries,
   isDayOff,
@@ -472,6 +518,10 @@ function CheckItemRow({
 }: {
   item: DailyCheckItem
   equipmentId: number
+  year: number
+  month: number
+  todayDay: number
+  isCurrentMonth: boolean
   days: number[]
   optimisticEntries: Map<string, string>
   isDayOff: (day: number) => boolean
@@ -524,16 +574,20 @@ function CheckItemRow({
         const key = `${item.id}-${day}`
         const value = optimisticEntries.get(key) ?? ''
         const dayOff = isDayOff(day)
+        const missing =
+          isCurrentMonth && day === todayDay && !value && isDueOnDay(year, month, day, cycle, isDayOff)
         return (
           <td
             key={day}
             onClick={() => onCellClick(item.id, day)}
             className={cn(
               'print-day-cell h-8 w-8 border-r border-b border-border p-0 text-center text-xs font-medium last:border-r-0',
-              dayOff ? 'weekend-cell bg-muted-foreground/10 cursor-not-allowed' : 'cursor-pointer hover:bg-accent/30',
+              dayOff && 'weekend-cell bg-muted-foreground/10',
+              'cursor-pointer hover:bg-accent/30',
+              missing && 'missing-today',
             )}
           >
-            {dayOff ? '' : value}
+            {value}
           </td>
         )
       })}
@@ -550,6 +604,10 @@ function SignatureRow({
   descPlaceholder,
   cycleOptions,
   defaultCycle,
+  year,
+  month,
+  todayDay,
+  isCurrentMonth,
   days,
   marks,
   markChar,
@@ -564,6 +622,10 @@ function SignatureRow({
   descPlaceholder: string
   cycleOptions: readonly string[]
   defaultCycle: string
+  year: number
+  month: number
+  todayDay: number
+  isCurrentMonth: boolean
   days: number[]
   marks: number[]
   markChar: string
@@ -607,16 +669,23 @@ function SignatureRow({
       {days.map((day) => {
         const dayOff = isDayOff(day)
         const marked = marks.includes(day)
+        const missing =
+          isCurrentMonth &&
+          day === todayDay &&
+          !marked &&
+          isDueOnDay(year, month, day, info.cycle || defaultCycle, isDayOff)
         return (
           <td
             key={day}
             onClick={() => onToggleDay(day)}
             className={cn(
               'print-day-cell h-8 w-8 border-r border-b border-border p-0 text-center text-xs font-medium last:border-r-0',
-              dayOff ? 'weekend-cell bg-muted-foreground/10 cursor-not-allowed' : 'cursor-pointer hover:bg-accent/30',
+              dayOff && 'weekend-cell bg-muted-foreground/10',
+              'cursor-pointer hover:bg-accent/30',
+              missing && 'missing-today',
             )}
           >
-            {dayOff || !marked ? '' : markChar}
+            {marked ? markChar : ''}
           </td>
         )
       })}

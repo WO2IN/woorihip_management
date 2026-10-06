@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache"
 import { findOne, insertRow, removeWhere, selectWhere, updateById, selectAll } from "@/lib/local-store"
 import { FIVE_S_CATALOG } from "@/lib/constants/five-s-catalog"
 import { canonicalFloor } from "@/lib/floor"
-import { isWeekend, scheduledDaysForCycle } from "@/lib/date-utils"
+import { isDayOffDate, isWeekend, scheduledDaysForCycle } from "@/lib/date-utils"
 
 export async function getFiveSTargets() {
   return selectAll("fiveSTargets")
@@ -127,15 +127,7 @@ export async function getFiveSEntries(sheetId: number) {
   return selectWhere("fiveSEntries", (e: any) => e.sheetId === sheetId)
 }
 
-function isSheetDayOff(sheet: { year: number; month: number; holidays?: number[] } | undefined, day: number) {
-  if (!sheet) return false
-  return isWeekend(sheet.year, sheet.month, day) || (sheet.holidays ?? []).includes(day)
-}
-
 export async function upsertFiveSEntry(sheetId: number, itemCode: string, day: number, value: string) {
-  const sheet = findOne<any>("fiveSSheets", (s: any) => s.id === sheetId)
-  if (value && isSheetDayOff(sheet, day)) return
-
   const existing = findOne(
     "fiveSEntries",
     (e: any) => e.sheetId === sheetId && e.itemCode === itemCode && e.day === day,
@@ -161,7 +153,8 @@ export async function bulkFillFiveSEntries(
 ) {
   const sheet = findOne<any>("fiveSSheets", (s: any) => s.id === sheetId)
   const holidays: number[] = sheet?.holidays ?? []
-  const isDayOff = (day: number) => isWeekend(year, month, day) || holidays.includes(day)
+  const workdays: number[] = sheet?.workdays ?? []
+  const isDayOff = (day: number) => isDayOffDate(year, month, day, holidays, workdays)
   const startDay = Math.max(1, fromDay)
 
   for (const item of items) {
@@ -221,7 +214,20 @@ export async function updateFiveSSheetFields(
 
 export async function toggleFiveSHoliday(sheetId: number, day: number) {
   const sheet = findOne<any>("fiveSSheets", (s: any) => s.id === sheetId)
-  const current: number[] = sheet?.holidays ?? []
+  if (!sheet) return []
+  if (isWeekend(sheet.year, sheet.month, day)) {
+    const current: number[] = sheet.workdays ?? []
+    const opening = !current.includes(day)
+    const next = opening ? [...current, day].sort((a, b) => a - b) : current.filter((d) => d !== day)
+    updateById("fiveSSheets", sheetId, { workdays: next })
+    if (!opening) {
+      removeWhere("fiveSEntries", (e: any) => e.sheetId === sheetId && e.day === day)
+    }
+    revalidatePath("/checksheets/5s")
+    revalidatePath("/checksheets/5s/[targetId]", "layout")
+    return next
+  }
+  const current: number[] = sheet.holidays ?? []
   const adding = !current.includes(day)
   const next = adding ? [...current, day].sort((a, b) => a - b) : current.filter((d) => d !== day)
   updateById("fiveSSheets", sheetId, { holidays: next })

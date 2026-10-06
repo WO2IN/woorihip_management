@@ -1,58 +1,129 @@
-import Link from 'next/link'
-import { ArrowRightIcon, Building2Icon } from 'lucide-react'
-import { getDashboardSummary } from '@/app/actions/dashboard'
-import { SiteHeader } from '@/components/site-header'
+import { getEquipmentList } from '@/app/actions/equipment'
+import { getFiveSTargets } from '@/app/actions/five-s'
+import { getTempHumidityTargets } from '@/app/actions/temp-humidity'
+import { getTodayCheckStatuses } from '@/app/actions/today-status'
+import { SiteHeader } from '@/components/layout/site-header'
+import { FloorHome } from '@/components/checksheets/floor-home'
+import { FLOOR_OPTIONS, detectFloor } from '@/lib/floor'
 import { currentYearMonth } from '@/lib/date-utils'
+import { todayStatusLabel, type TodayStatus } from '@/lib/today-check'
 
-export default async function DashboardPage() {
+export default async function HomePage({ searchParams }: { searchParams: Promise<{ floor?: string }> }) {
+  const { floor: rawFloor } = await searchParams
+  const selectedFloor =
+    rawFloor === '미지정' || FLOOR_OPTIONS.some((option) => option.value === rawFloor) ? rawFloor : undefined
   const { year, month } = currentYearMonth()
-  const { equipmentCount } = await getDashboardSummary()
-  const floorShortcuts = ['1', '2', '3']
+  const [list, fiveSTargets, tempHumidityTargets, today] = await Promise.all([
+    getEquipmentList(),
+    getFiveSTargets(),
+    getTempHumidityTargets(),
+    getTodayCheckStatuses(),
+  ])
+  const statusOf = (status: TodayStatus | undefined) => {
+    const value = status ?? 'off'
+    return { status: value, statusLabel: todayStatusLabel(value, today.weekend) }
+  }
+
+  const matchesFloor = (item: { floor?: string | null; name: string }, floor: string) =>
+    detectFloor(item.floor, item.name) === floor
+
+  const hasUnassigned =
+    selectedFloor === '미지정' ||
+    [...list, ...fiveSTargets, ...tempHumidityTargets].some((item) => detectFloor(item.floor, item.name) === '미지정')
+  const floorChoices = [
+    ...FLOOR_OPTIONS.map((option) => ({ floor: option.value, label: option.label })),
+    ...(hasUnassigned ? [{ floor: '미지정', label: '층 미지정' }] : []),
+  ]
+
+  const floorStats = floorChoices.map((option) => {
+    const fiveSItems = fiveSTargets.filter((item) => matchesFloor(item, option.floor))
+    const dailyItems = list.filter((item) => matchesFloor(item, option.floor))
+    const tempItems = tempHumidityTargets.filter((item) => matchesFloor(item, option.floor))
+    const missing =
+      fiveSItems.filter((item) => today.fiveS[item.id] === 'missing').length +
+      dailyItems.filter((item) => today.daily[item.id] === 'missing').length +
+      tempItems.filter((item) => today.temp[item.id] === 'missing').length
+    return {
+      floor: option.floor,
+      label: option.label,
+      fiveS: fiveSItems.length,
+      daily: dailyItems.length,
+      tempHumidity: tempItems.length,
+      total: fiveSItems.length + dailyItems.length + tempItems.length,
+      missing,
+    }
+  })
+
+  const filteredList = selectedFloor ? list.filter((item) => matchesFloor(item, selectedFloor)) : []
+  const filteredFiveSTargets = selectedFloor
+    ? fiveSTargets.filter((item) => matchesFloor(item, selectedFloor))
+    : []
+  const filteredTempHumidityTargets = selectedFloor
+    ? tempHumidityTargets.filter((item) => matchesFloor(item, selectedFloor))
+    : []
+
+  const summaryCards = [
+    {
+      href: `/checksheets/5s?floor=${encodeURIComponent(selectedFloor ?? '')}`,
+      title: '3정 5S',
+      description: '정리·정돈·청소·표준화 점검',
+      count: filteredFiveSTargets.length,
+      icon: 'clipboard' as const,
+      tone: 'sky' as const,
+      items: filteredFiveSTargets.map((target) => ({
+        id: target.id,
+        name: target.name,
+        meta: `${target.department || ''}`.trim() || undefined,
+        inspector: target.manager || undefined,
+        href: `/checksheets/5s/${target.id}`,
+        ...statusOf(today.fiveS[target.id]),
+      })),
+    },
+    {
+      href: `/checksheets/daily?floor=${encodeURIComponent(selectedFloor ?? '')}`,
+      title: '설비 일상점검',
+      description: '설비별 일상 점검 항목과 기록',
+      count: filteredList.length,
+      icon: 'wrench' as const,
+      tone: 'amber' as const,
+      items: filteredList.map((equipment) => ({
+        id: equipment.id,
+        name: equipment.name,
+        meta: equipment.department || undefined,
+        inspector: equipment.inspectorName || undefined,
+        href: `/checksheets/daily/${equipment.id}`,
+        ...statusOf(today.daily[equipment.id]),
+      })),
+    },
+    {
+      href: `/checksheets/temp-humidity?floor=${encodeURIComponent(selectedFloor ?? '')}`,
+      title: '온/습도',
+      description: '온도·습도 측정 기록과 추이',
+      count: filteredTempHumidityTargets.length,
+      icon: 'thermometer' as const,
+      tone: 'violet' as const,
+      items: filteredTempHumidityTargets.map((target) => ({
+        id: target.id,
+        name: target.name,
+        meta: target.department || undefined,
+        inspector: target.manager || undefined,
+        href: `/checksheets/temp-humidity/${target.id}`,
+        ...statusOf(today.temp[target.id]),
+      })),
+    },
+  ]
 
   return (
     <div className="min-h-dvh bg-background">
-      <SiteHeader active="/" />
-      <main className="mx-auto flex max-w-[1400px] flex-col gap-8 px-4 py-8 sm:px-6">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-semibold">설비/품질 점검 관리시스템</h1>
-          <p className="text-sm text-muted-foreground">
-            {year}년 {month}월 · 등록된 설비 {equipmentCount}대
-          </p>
-        </div>
-
-        <section className="flex flex-col gap-3" aria-labelledby="floor-shortcuts-heading">
-          <div>
-            <h2 id="floor-shortcuts-heading" className="text-lg font-semibold">층별 바로가기</h2>
-            <p className="mt-1 text-sm text-muted-foreground">확인할 층을 선택해 설비 목록으로 이동합니다.</p>
-          </div>
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
-            {floorShortcuts.map((floor, index) => (
-              <Link
-                key={floor}
-                href={`/equipment?floor=${floor}`}
-                className="group relative isolate min-h-40 overflow-hidden rounded-2xl border border-border bg-card p-6 shadow-sm transition-all duration-200 hover:-translate-y-1 hover:border-primary/60 hover:shadow-lg hover:shadow-primary/10"
-              >
-                <span className="absolute -right-8 -top-8 -z-10 size-32 rounded-full bg-primary/5 transition-transform duration-300 group-hover:scale-150" aria-hidden="true" />
-                <span className="flex items-start justify-between">
-                  <span className="flex size-12 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-md shadow-primary/20">
-                    <Building2Icon className="size-6" aria-hidden="true" />
-                  </span>
-                  <span className="flex size-8 items-center justify-center rounded-full border border-border bg-background/70 text-xs font-bold text-muted-foreground">
-                    0{index + 1}
-                  </span>
-                </span>
-                <span className="mt-7 flex items-end justify-between">
-                  <span>
-                    <span className="block text-xl font-bold tracking-tight">{floor}층</span>
-                    <span className="mt-1 block text-sm text-muted-foreground">설비 점검 현황 보기</span>
-                  </span>
-                  <ArrowRightIcon className="mb-1 size-5 text-primary transition-transform duration-200 group-hover:translate-x-1" aria-hidden="true" />
-                </span>
-              </Link>
-            ))}
-          </div>
-        </section>
-      </main>
+      <SiteHeader />
+      <FloorHome
+        selectedFloor={selectedFloor}
+        floorStats={floorStats}
+        cards={summaryCards}
+        year={year}
+        month={month}
+        todayLabel={`${today.month}월 ${today.day}일`}
+      />
     </div>
   )
 }

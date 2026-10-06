@@ -6,16 +6,16 @@ import {
   updateTempHumidityTarget,
   toggleTempHumidityHoliday,
 } from '@/app/actions/temp-humidity'
-import { SiteHeader } from '@/components/site-header'
-import { YearMonthPicker } from '@/components/year-month-picker'
-import { ApprovalBox } from '@/components/approval-box'
-import { RemarksField } from '@/components/remarks-field'
-import { PrintButton } from '@/components/print-button'
-import { TempHumidityTable } from '@/components/temp-humidity-table'
-import { TempHumidityChart } from '@/components/temp-humidity-chart'
+import { SiteHeader } from '@/components/layout/site-header'
+import { YearMonthPicker } from '@/components/shared/year-month-picker'
+import { ApprovalBox } from '@/components/shared/approval-box'
+import { RemarksField } from '@/components/shared/remarks-field'
+import { PrintButton } from '@/components/shared/print-button'
+import { TempHumidityTable } from '@/components/checksheets/temp-humidity/temp-humidity-table'
+import { TempHumidityChart } from '@/components/checksheets/temp-humidity/temp-humidity-chart'
 import { currentYearMonth } from '@/lib/date-utils'
 import { notFound } from 'next/navigation'
-import { SheetHeaderEditor } from '@/components/sheet-header-editor'
+import { SheetHeaderEditor } from '@/components/shared/sheet-header-editor'
 
 export default async function TempHumidityPage({
   params,
@@ -61,7 +61,7 @@ export default async function TempHumidityPage({
 
   return (
     <div className="temp-humidity-page min-h-dvh bg-background">
-      <SiteHeader active="/checksheets/temp-humidity" />
+      <SiteHeader />
       <main className="print-page mx-auto flex max-w-[1400px] flex-col gap-4 px-4 py-6 sm:px-6">
         <div className="no-print flex flex-wrap items-center justify-between gap-3">
           <YearMonthPicker year={year} month={month} />
@@ -126,6 +126,7 @@ export default async function TempHumidityPage({
             entries={entries}
             manager={target.manager || ''}
             holidays={holidays}
+            workdays={(sheet as any).workdays ?? []}
             onToggleHoliday={toggleHoliday}
           />
         </div>

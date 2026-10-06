@@ -13,15 +13,15 @@ import {
   updateDailyCheckSheetFields,
   toggleDailyCheckHoliday,
 } from '@/app/actions/daily-check'
-import { SiteHeader } from '@/components/site-header'
-import { YearMonthPicker } from '@/components/year-month-picker'
-import { ApprovalBox } from '@/components/approval-box'
-import { PrintButton } from '@/components/print-button'
-import { DailyCheckGrid } from '@/components/daily-check-grid'
-import { EmergencyActionCard } from '@/components/emergency-action-card'
+import { SiteHeader } from '@/components/layout/site-header'
+import { YearMonthPicker } from '@/components/shared/year-month-picker'
+import { ApprovalBox } from '@/components/shared/approval-box'
+import { PrintButton } from '@/components/shared/print-button'
+import { DailyCheckGrid } from '@/components/checksheets/daily/daily-check-grid'
+import { DailySheetEditor } from '@/components/checksheets/daily/daily-sheet-editor'
+import { EmergencyActionCard } from '@/components/equipment/emergency-action-card'
 import { currentYearMonth } from '@/lib/date-utils'
-import { cn } from '@/lib/utils'
-import { SheetHeaderEditor } from '@/components/sheet-header-editor'
+import { SheetHeaderEditor } from '@/components/shared/sheet-header-editor'
 
 export default async function DailyCheckDetailPage({
   params,
@@ -62,11 +62,14 @@ export default async function DailyCheckDetailPage({
 
   return (
     <div className="min-h-dvh bg-background">
-      <SiteHeader active="/checksheets/daily" />
+      <SiteHeader />
       <main className="print-page mx-auto flex max-w-[1400px] flex-col gap-4 px-4 py-6 sm:px-6">
         <div className="no-print flex flex-wrap items-center justify-between gap-3">
           <YearMonthPicker year={year} month={month} />
-          <PrintButton />
+          <div className="flex items-center gap-2">
+            <DailySheetEditor equipmentId={equipId} equipmentName={equip.name} photos={photos} items={items} />
+            <PrintButton />
+          </div>
         </div>
 
         <div className="print-compact-box flex flex-wrap items-start justify-between gap-4 border border-border bg-card p-4">
@@ -103,23 +106,37 @@ export default async function DailyCheckDetailPage({
         </div>
 
         {photos.length > 0 && (
-          <div className="print-photo-box flex flex-wrap items-start gap-3 border border-border bg-card p-4">
-            {photos.map((photo) => {
-              const isOverview = photo.label === '전체 전경'
-              return (
-                <figure key={photo.id} className={cn('flex flex-col gap-1', isOverview ? 'w-72' : 'w-32')}>
+          <div className="print-photo-box flex items-start gap-3 border border-border bg-card p-4">
+            {photos
+              .filter((photo) => photo.label === '전체 전경')
+              .map((photo) => (
+                <figure key={photo.id} className="print-photo-overview flex w-72 shrink-0 flex-col gap-1">
                   <img
                     src={photo.url || '/placeholder.svg'}
                     alt={photo.label || equip.name}
-                    className={cn(
-                      'w-full rounded-md border border-border object-cover',
-                      isOverview ? 'aspect-[16/10]' : 'aspect-square',
-                    )}
+                    className="aspect-[16/10] w-full rounded-md border border-border object-cover"
                   />
                   <figcaption className="text-center text-xs text-muted-foreground">{photo.label}</figcaption>
                 </figure>
-              )
-            })}
+              ))}
+            {photos.some((photo) => photo.label !== '전체 전경') && (
+              <div className="print-photo-parts flex min-w-0 flex-1 items-start gap-2">
+                {photos
+                  .filter((photo) => photo.label !== '전체 전경')
+                  .map((photo) => (
+                    <figure key={photo.id} className="flex w-32 max-w-32 min-w-0 shrink flex-col gap-1">
+                      <img
+                        src={photo.url || '/placeholder.svg'}
+                        alt={photo.label || equip.name}
+                        className="aspect-square w-full rounded-md border border-border object-cover"
+                      />
+                      <figcaption className="truncate text-center text-xs text-muted-foreground">
+                        {photo.label}
+                      </figcaption>
+                    </figure>
+                  ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -131,6 +148,7 @@ export default async function DailyCheckDetailPage({
           items={items}
           entries={entries}
           holidays={holidays}
+          workdays={(sheet as any).workdays ?? []}
           onToggleHoliday={toggleHoliday}
           inspector={{
             name: equip.inspectorName ?? '',

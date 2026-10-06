@@ -8,6 +8,17 @@ export function isWeekend(year: number, month: number, day: number): boolean {
   return dow === 0 || dow === 6
 }
 
+export function isDayOffDate(
+  year: number,
+  month: number,
+  day: number,
+  holidays: readonly number[] = [],
+  workdays: readonly number[] = [],
+): boolean {
+  if (holidays.includes(day)) return true
+  return isWeekend(year, month, day) && !workdays.includes(day)
+}
+
 export function dayOfWeekLabel(year: number, month: number, day: number): string {
   const labels = ["일", "월", "화", "수", "목", "금", "토"]
   const date = new Date(year, month - 1, day)

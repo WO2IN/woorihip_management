@@ -17,6 +17,8 @@ import {
 } from '@/components/ui/alert-dialog'
 import { toast } from 'sonner'
 import { formatFloorLabel } from '@/lib/floor'
+import { TodayStatusBadge } from '@/components/shared/today-status-badge'
+import type { TodayStatus } from '@/lib/today-check'
 
 interface TargetListRowProps {
   href: string
@@ -24,10 +26,13 @@ interface TargetListRowProps {
   floor?: string | null
   department?: string | null
   manager?: string | null
+  inspectorName?: string | null
   deleteTitle: string
   deleteDescription: string
   deleteAction: (id: number) => Promise<void>
   id: number
+  status?: TodayStatus
+  statusLabel?: string
 }
 
 export function TargetListRow({
@@ -36,10 +41,13 @@ export function TargetListRow({
   floor,
   department,
   manager,
+  inspectorName,
   deleteTitle,
   deleteDescription,
   deleteAction,
   id,
+  status,
+  statusLabel,
 }: TargetListRowProps) {
   const [pending, setPending] = useState(false)
 
@@ -62,10 +70,21 @@ export function TargetListRow({
         <div className="flex min-w-0 flex-col gap-0.5">
           <span className="font-medium">{name}</span>
           <span className="truncate text-sm text-muted-foreground">
-            {formatFloorLabel(floor, name)} · {department || '부서 미지정'} · {manager || '담당자 미지정'}
+            {formatFloorLabel(floor, name)} · {department || '부서 미지정'}
+            {inspectorName ? (
+              <>
+                {' · '}
+                <span className="font-semibold text-primary">점검자 {inspectorName}</span>
+              </>
+            ) : (
+              <> · {manager || '담당자 미지정'}</>
+            )}
           </span>
         </div>
-        <ChevronRightIcon className="size-4 shrink-0 text-muted-foreground" />
+        <span className="flex shrink-0 items-center gap-2">
+          {status && statusLabel ? <TodayStatusBadge status={status} label={statusLabel} /> : null}
+          <ChevronRightIcon className="size-4 text-muted-foreground" />
+        </span>
       </Link>
       <AlertDialog>
         <AlertDialogTrigger

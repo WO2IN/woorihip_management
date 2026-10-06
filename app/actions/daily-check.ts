@@ -2,12 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 import { findOne, insertRow, removeWhere, selectWhere, updateById, updateWhere } from "@/lib/local-store"
-import { isWeekend, scheduledDaysForCycle } from "@/lib/date-utils"
-
-function isSheetDayOff(sheet: { year: number; month: number; holidays?: number[] } | undefined, day: number) {
-  if (!sheet) return false
-  return isWeekend(sheet.year, sheet.month, day) || (sheet.holidays ?? []).includes(day)
-}
+import { isDayOffDate, isWeekend, scheduledDaysForCycle } from "@/lib/date-utils"
 
 function revalidateDaily() {
   revalidatePath("/checksheets/daily")
@@ -40,9 +35,6 @@ export async function getDailyCheckEntries(sheetId: number) {
 }
 
 export async function upsertDailyCheckEntry(sheetId: number, itemId: number, day: number, value: string) {
-  const sheet = findOne<any>("dailyCheckSheets", (s: any) => s.id === sheetId)
-  if (value && isSheetDayOff(sheet, day)) return
-
   const existing = findOne(
     "dailyCheckEntries",
     (e: any) => e.sheetId === sheetId && e.itemId === itemId && e.day === day,
@@ -67,7 +59,8 @@ export async function bulkFillDailyCheckEntries(
 ) {
   const sheet = findOne<any>("dailyCheckSheets", (s: any) => s.id === sheetId)
   const holidays: number[] = sheet?.holidays ?? []
-  const isDayOff = (day: number) => isWeekend(year, month, day) || holidays.includes(day)
+  const workdays: number[] = sheet?.workdays ?? []
+  const isDayOff = (day: number) => isDayOffDate(year, month, day, holidays, workdays)
   const startDay = Math.max(1, fromDay)
 
   for (const item of items) {
@@ -91,7 +84,7 @@ export async function bulkFillDailyCheckEntries(
 
 export async function toggleDailyCheckMark(sheetId: number, role: "inspector" | "manager", day: number) {
   const sheet = findOne<any>("dailyCheckSheets", (s: any) => s.id === sheetId)
-  if (!sheet || isSheetDayOff(sheet, day)) return
+  if (!sheet) return
   const field = role === "inspector" ? "inspectorMarks" : "managerMarks"
   const current: number[] = sheet[field] ?? []
   const next = current.includes(day) ? current.filter((d) => d !== day) : [...current, day].sort((a, b) => a - b)
@@ -112,7 +105,8 @@ export async function fillDailyCheckMarks(
   const sheet = findOne<any>("dailyCheckSheets", (s: any) => s.id === sheetId)
   if (!sheet) return
   const holidays: number[] = sheet.holidays ?? []
-  const isDayOff = (day: number) => isWeekend(year, month, day) || holidays.includes(day)
+  const workdays: number[] = sheet.workdays ?? []
+  const isDayOff = (day: number) => isDayOffDate(year, month, day, holidays, workdays)
   const inspectorDays = scheduledDaysForCycle(year, month, fromDay, toDay, inspectorCycle || "1회/일", isDayOff)
   const managerDays = scheduledDaysForCycle(year, month, fromDay, toDay, managerCycle || "1회/주", isDayOff)
   const inspectorMarks = Array.from(new Set([...(sheet.inspectorMarks ?? []), ...inspectorDays])).sort((a, b) => a - b)
@@ -137,14 +131,29 @@ export async function updateDailyCheckSheetFields(
 
 export async function toggleDailyCheckHoliday(sheetId: number, day: number) {
   const sheet = findOne<any>("dailyCheckSheets", (s: any) => s.id === sheetId)
-  const current: number[] = sheet?.holidays ?? []
+  if (!sheet) return []
+  if (isWeekend(sheet.year, sheet.month, day)) {
+    const current: number[] = sheet.workdays ?? []
+    const opening = !current.includes(day)
+    const next = opening ? [...current, day].sort((a, b) => a - b) : current.filter((d) => d !== day)
+    const patch: Record<string, unknown> = { workdays: next }
+    if (!opening) {
+      removeWhere("dailyCheckEntries", (e: any) => e.sheetId === sheetId && e.day === day)
+      patch.inspectorMarks = (sheet.inspectorMarks ?? []).filter((d: number) => d !== day)
+      patch.managerMarks = (sheet.managerMarks ?? []).filter((d: number) => d !== day)
+    }
+    updateById("dailyCheckSheets", sheetId, patch)
+    revalidateDaily()
+    return next
+  }
+  const current: number[] = sheet.holidays ?? []
   const adding = !current.includes(day)
   const next = adding ? [...current, day].sort((a, b) => a - b) : current.filter((d) => d !== day)
   const patch: Record<string, unknown> = { holidays: next }
   if (adding) {
     removeWhere("dailyCheckEntries", (e: any) => e.sheetId === sheetId && e.day === day)
-    patch.inspectorMarks = (sheet?.inspectorMarks ?? []).filter((d: number) => d !== day)
-    patch.managerMarks = (sheet?.managerMarks ?? []).filter((d: number) => d !== day)
+    patch.inspectorMarks = (sheet.inspectorMarks ?? []).filter((d: number) => d !== day)
+    patch.managerMarks = (sheet.managerMarks ?? []).filter((d: number) => d !== day)
   }
   updateById("dailyCheckSheets", sheetId, patch)
   revalidateDaily()

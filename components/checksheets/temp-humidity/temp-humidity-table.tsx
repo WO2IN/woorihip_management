@@ -2,12 +2,13 @@
 
 import { useEffect, useMemo, useOptimistic, useRef, useState, useTransition } from 'react'
 import { cn } from '@/lib/utils'
-import { getDayRange, isWeekend } from '@/lib/date-utils'
+import { getDayRange, isDayOffDate } from '@/lib/date-utils'
+import { filledValue } from '@/lib/today-check'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { bulkUpsertTempHumidityEntries, upsertTempHumidityEntry, clearTempHumidityEntries } from '@/app/actions/temp-humidity'
 import { CalendarCheck2Icon, DicesIcon, Trash2Icon } from 'lucide-react'
-import { HolidayPickerPopover } from '@/components/holiday-picker-popover'
+import { HolidayPickerPopover } from '@/components/shared/holiday-picker-popover'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -42,6 +43,7 @@ interface TempHumidityTableProps {
   entries: TempHumidityEntry[]
   manager?: string
   holidays?: number[]
+  workdays?: number[]
   onToggleHoliday?: (day: number) => void
 }
 
@@ -74,6 +76,7 @@ export function TempHumidityTable({
   entries,
   manager = '',
   holidays = [],
+  workdays = [],
   onToggleHoliday,
 }: TempHumidityTableProps) {
   const days = getDayRange(year, month)
@@ -98,7 +101,7 @@ export function TempHumidityTable({
   const [rangeEnd, setRangeEnd] = useState(String(defaultRangeEnd))
 
   function isDayOff(day: number) {
-    return isWeekend(year, month, day) || holidays.includes(day)
+    return isDayOffDate(year, month, day, holidays, workdays)
   }
 
   const entryMap = new Map(entries.map((e) => [e.day, e]))
@@ -133,7 +136,6 @@ export function TempHumidityTable({
   }, [])
 
   function handleBlur(day: number, field: 'temperature' | 'humidity' | 'checker', value: string) {
-    if (isDayOff(day)) return
     startTransition(() => {
       setOptimisticEntry({ day, fields: { [field]: value || null } })
       upsertTempHumidityEntry(sheetId, day, { [field]: value || null })
@@ -219,7 +221,7 @@ export function TempHumidityTable({
   }
 
   function handleHolidayToggle(day: number) {
-    if (isWeekend(year, month, day) || !onToggleHoliday) return
+    if (!onToggleHoliday) return
     onToggleHoliday(day)
   }
 
@@ -314,7 +316,7 @@ export function TempHumidityTable({
           )}
 
           {onToggleHoliday && (
-            <HolidayPickerPopover year={year} month={month} holidays={holidays} onToggle={handleHolidayToggle} />
+            <HolidayPickerPopover year={year} month={month} holidays={holidays} workdays={workdays} onToggle={handleHolidayToggle} />
           )}
 
           <AlertDialog>
@@ -352,6 +354,12 @@ export function TempHumidityTable({
         </div>
       </div>
 
+      {isCurrentMonth && (
+        <p className="no-print px-1 text-xs text-muted-foreground">
+          오늘({todayDay}일) 온도, 습도, 점검자 중 비어 있는 칸은 노란색으로 표시됩니다.
+        </p>
+      )}
+
       <div className="print-sheet overflow-x-auto border border-border">
         <table className="no-print min-w-[900px] w-full border-collapse text-xs">
           <thead>
@@ -365,6 +373,7 @@ export function TempHumidityTable({
                     className={cn(
                       'min-w-7 border-r border-b border-border bg-muted p-1 text-center text-xs font-medium',
                       dayOff && 'weekend-cell',
+                      isCurrentMonth && day === todayDay && 'today-col',
                     )}
                   >
                     {day}
@@ -380,13 +389,13 @@ export function TempHumidityTable({
                 {days.map((day) => {
                   const entry = optimisticEntries.get(day)
                   const dayOff = isDayOff(day)
+                  const missing = isCurrentMonth && day === todayDay && !dayOff && !filledValue(entry?.[field])
                   return (
-                    <td key={day} className={cn('border-r border-b border-border p-0', dayOff && 'weekend-cell bg-muted-foreground/10')}>
+                    <td key={day} className={cn('border-r border-b border-border p-0', dayOff && 'weekend-cell bg-muted-foreground/10', missing && 'missing-today')}>
                       <Input
                         aria-label={`${day}일 ${field === 'temperature' ? '온도' : '습도'}`}
                         type="number"
                         step="1"
-                        disabled={dayOff}
                         defaultValue={entry?.[field] ?? ''}
                         key={`${field}-${day}-${entry?.[field] ?? ''}`}
                         onBlur={(e) => handleBlur(day, field, e.target.value)}
@@ -401,11 +410,11 @@ export function TempHumidityTable({
               <th className="border-r border-b border-border bg-muted p-1.5 text-left text-xs font-medium">점검자</th>
               {days.map((day) => {
                 const dayOff = isDayOff(day)
+                const missing = isCurrentMonth && day === todayDay && !dayOff && !filledValue(optimisticEntries.get(day)?.checker)
                 return (
-                  <td key={day} className={cn('border-r border-b border-border p-0', dayOff && 'weekend-cell bg-muted-foreground/10')}>
+                  <td key={day} className={cn('border-r border-b border-border p-0', dayOff && 'weekend-cell bg-muted-foreground/10', missing && 'missing-today')}>
                     <Input
                       aria-label={`${day}일 점검자`}
-                      disabled={dayOff}
                       defaultValue={optimisticEntries.get(day)?.checker ?? ''}
                       key={`checker-${day}-${optimisticEntries.get(day)?.checker ?? ''}`}
                       onBlur={(e) => handleBlur(day, 'checker', e.target.value)}

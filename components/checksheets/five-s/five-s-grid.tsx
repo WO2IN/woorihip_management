@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useOptimistic, useRef, useState, useTransition } from 'react'
 import { cn } from '@/lib/utils'
-import { getDayRange, isWeekend, scheduledDaysForCycle } from '@/lib/date-utils'
+import { getDayRange, isDayOffDate, isWeekend, scheduledDaysForCycle } from '@/lib/date-utils'
+import { isDueOnDay } from '@/lib/today-check'
 import { FIVE_S_CATEGORIES, FIVE_S_SYMBOLS } from '@/lib/constants/five-s-catalog'
 import {
   upsertFiveSEntry,
@@ -13,9 +14,9 @@ import {
 import { Trash2Icon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { CellSelect } from '@/components/cell-select'
-import { HolidayPickerPopover } from '@/components/holiday-picker-popover'
-import { RangeFillPopover } from '@/components/range-fill-popover'
+import { CellSelect } from '@/components/shared/cell-select'
+import { HolidayPickerPopover } from '@/components/shared/holiday-picker-popover'
+import { RangeFillPopover } from '@/components/shared/range-fill-popover'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -45,6 +46,7 @@ interface FiveSGridProps {
   items: FiveSCheckItem[]
   entries: { itemCode: string; day: number; value: string | null }[]
   holidays?: number[]
+  workdays?: number[]
   onToggleHoliday?: (day: number) => void
 }
 
@@ -57,7 +59,7 @@ const SYMBOL_LABELS: Record<string, string> = {
   'N/A': '해당없음',
 }
 
-export function FiveSGrid({ sheetId, year, month, items, entries, holidays = [], onToggleHoliday }: FiveSGridProps) {
+export function FiveSGrid({ sheetId, year, month, items, entries, holidays = [], workdays = [], onToggleHoliday }: FiveSGridProps) {
   const days = getDayRange(year, month)
   const [, startTransition] = useTransition()
   const [selectedSymbol, setSelectedSymbol] = useState<string>('○')
@@ -68,9 +70,14 @@ export function FiveSGrid({ sheetId, year, month, items, entries, holidays = [],
     (state, day: number) =>
       state.includes(day) ? state.filter((d) => d !== day) : [...state, day].sort((a, b) => a - b),
   )
+  const [optimisticWorkdays, toggleOptimisticWorkday] = useOptimistic(
+    workdays,
+    (state, day: number) =>
+      state.includes(day) ? state.filter((d) => d !== day) : [...state, day].sort((a, b) => a - b),
+  )
 
   function isDayOff(day: number) {
-    return isWeekend(year, month, day) || optimisticHolidays.includes(day)
+    return isDayOffDate(year, month, day, optimisticHolidays, optimisticWorkdays)
   }
   const commandBuffer = useRef('')
   const commandTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -118,8 +125,6 @@ export function FiveSGrid({ sheetId, year, month, items, entries, holidays = [],
   }
 
   function handleCellClick(item: FiveSCheckItem, day: number) {
-    if (isDayOff(day)) return
-  
     const key = `${item.code}-${day}`
     const current = optimisticEntries.get(key) ?? ''
   
@@ -182,7 +187,21 @@ export function FiveSGrid({ sheetId, year, month, items, entries, holidays = [],
   }
 
   function handleHolidayToggle(day: number) {
-    if (isWeekend(year, month, day) || !onToggleHoliday) return
+    if (!onToggleHoliday) return
+    const weekend = isWeekend(year, month, day)
+    if (weekend) {
+      const opening = !optimisticWorkdays.includes(day)
+      startTransition(() => {
+        toggleOptimisticWorkday(day)
+        if (!opening) {
+          for (const item of items) {
+            setOptimisticEntry({ key: `${item.code}-${day}`, value: '' })
+          }
+        }
+        onToggleHoliday(day)
+      })
+      return
+    }
     const adding = !optimisticHolidays.includes(day)
     startTransition(() => {
       toggleOptimisticHoliday(day)
@@ -229,6 +248,7 @@ export function FiveSGrid({ sheetId, year, month, items, entries, holidays = [],
               year={year}
               month={month}
               holidays={optimisticHolidays}
+              workdays={optimisticWorkdays}
               onToggle={handleHolidayToggle}
             />
           )}
@@ -269,6 +289,7 @@ export function FiveSGrid({ sheetId, year, month, items, entries, holidays = [],
       </div>
       <p className="no-print px-1 text-xs text-muted-foreground">
         위에서 표시를 선택한 뒤 칸을 클릭하면 바로 입력됩니다. 같은 표시를 다시 클릭하면 지워집니다.
+        {isCurrentMonth ? ' 오늘 채워야 하는데 비어 있는 칸은 노란색으로 표시됩니다.' : ''}
       </p>
 
       <div className="print-sheet overflow-x-auto border border-border">
@@ -299,14 +320,14 @@ export function FiveSGrid({ sheetId, year, month, items, entries, holidays = [],
             </tr>
             <tr>
               {days.map((day) => {
-                const weekend = isWeekend(year, month, day)
-                const holiday = optimisticHolidays.includes(day)
+                const dayOff = isDayOff(day)
                 return (
                   <th
                     key={day}
                     className={cn(
                       'print-day-cell h-7 print:h-5 w-8 border-r border-b border-border p-0 text-xs print:text-[10px] font-medium last:border-r-0',
-                      (weekend || holiday) && 'weekend-cell bg-muted-foreground/10',
+                      dayOff && 'weekend-cell bg-muted-foreground/10',
+                      isCurrentMonth && day === todayDay && 'today-col',
                     )}
                   >
                     {day}
@@ -357,40 +378,42 @@ export function FiveSGrid({ sheetId, year, month, items, entries, holidays = [],
 
                     const isNACell = value === 'N/A'
                     const monthlyHighlight = item.cycle === '월'
+                    const missing =
+                      isCurrentMonth &&
+                      day === todayDay &&
+                      !value &&
+                      !hasNA &&
+                      isDueOnDay(year, month, day, item.cycle || '일', isDayOff)
 
                     return (
                       <td
                         key={day}
                         onClick={() => {
-                          if (dayOff) return
                           if (hasNA && !isNACell) return
                           handleCellClick(item, day)
                         }}
                         className={cn(
                           'print-day-cell relative h-8 print:h-5 w-8 border-r border-b border-border p-0 text-center text-xs print:text-[10px] font-medium last:border-r-0',
                         
-                          dayOff &&
-                            'weekend-cell cursor-not-allowed bg-muted-foreground/10',
+                          dayOff && 'weekend-cell bg-muted-foreground/10',
                         
-                          !dayOff &&
-                            hasNA &&
+                          hasNA &&
                             !isNACell &&
                             'cursor-not-allowed bg-red-50',
                         
-                          !dayOff &&
-                            !hasNA &&
-                            'cursor-pointer hover:bg-accent/30',
+                          !(hasNA && !isNACell) && 'cursor-pointer hover:bg-accent/30',
                         
                           monthlyHighlight &&
-                            !dayOff &&
                             !hasNA &&
                             'monthly-cell bg-accent/70',
+
+                          missing && 'missing-today',
                         
                           hasNA &&
                             'after:pointer-events-none after:absolute after:left-0 after:right-0 after:top-1/2 after:h-[2px] after:bg-red-500',
                         )}
                       >
-                        {dayOff ? '' : value}
+                        {value}
                       </td>
                     )
                   })}
